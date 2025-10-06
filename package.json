@@ -1,18 +1,41 @@
 {
-  "name": "wms-admin",
+  "name": "wms",
   "version": "1.0.0",
   "main": "src/index.js",
   "scripts": {
-    "start": "electron src/index.js"
+    "start": "electron src/index.js",
+    "dev": "NODE_ENV=development electron src/index.js",
+    "build": "electron-builder"
   },
-  "keywords": [],
+  "keywords": ["wms", "bodega", "electron"],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "Sistema WMS para supervisión de preparadores de pedidos",
   "dependencies": {
     "electron": "^38.2.0",
     "electron-reload": "^2.0.0-alpha.1",
+    "electron-updater": "^6.1.7",
+    "electron-log": "^5.0.1",
     "mysql2": "^3.15.1",
     "sweetalert2": "^11.23.0"
+  },
+  "devDependencies": {
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.wms.admin",
+    "productName": "WMS Admin",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "src/LogoWMS.ico"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "dalquijayg",
+      "repo": "WMSAdmin"
+    }
   }
 }

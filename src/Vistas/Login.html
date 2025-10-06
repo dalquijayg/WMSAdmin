@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WMS - Sistema de Gestión de Bodega</title>
-    <link rel="stylesheet" href="../Diseño/Login.css">
+    <link rel="stylesheet" href="../Disenos/Login.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
     <!-- Logo de la empresa -->
     <div class="brand-container">
-        <img src="../Imagenes/LogoWMS.png" alt="WMS Logo" class="brand-logo">
+        <img src="../Imagenes/logo-wms.png" alt="WMS Logo" class="brand-logo">
     </div>
     
     <!-- Elementos decorativos de fondo -->
@@ -35,8 +35,8 @@
             
             <div class="color-strip">
                 <div class="strip-item strip-blue"></div>
-                <div class="strip-item strip-blue"></div>
-                <div class="strip-item strip-blue"></div>
+                <div class="strip-item strip-red"></div>
+                <div class="strip-item strip-dark"></div>
             </div>
             
             <form id="loginForm">
@@ -67,10 +67,200 @@
             
             <div class="footer-text">
                 <p>Sistema de Gestión de Bodega v1.0.0</p>
+                <p>© 2025 - Todos los derechos reservados</p>
             </div>
         </div>
     </div>
     
     <script src="../Logica/Login.js"></script>
+    <script>
+        const { ipcRenderer } = require('electron');
+        
+        // Variable para almacenar el modal de actualización actual
+        let currentUpdateModal = null;
+        
+        // Función para actualizar la barra de progreso en tiempo real
+        function updateProgressBar(percent, message) {
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            
+            if (progressBar && progressText) {
+                progressBar.style.width = percent + '%';
+                progressText.textContent = message;
+            }
+        }
+        
+        // Función para formatear bytes
+        function formatBytes(bytes, decimals = 2) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+        
+        // Función para formatear velocidad
+        function formatSpeed(bytesPerSecond) {
+            return formatBytes(bytesPerSecond) + '/s';
+        }
+        
+        // Manejar actualización disponible
+        ipcRenderer.on('update_available', (event, info) => {
+            ipcRenderer.removeAllListeners('update_available');
+            console.log('Actualización disponible:', info);
+            
+            // Deshabilitar formulario
+            document.querySelector('.login-box').style.pointerEvents = 'none';
+            document.querySelector('.login-box').style.opacity = '0.7';
+            
+            currentUpdateModal = Swal.fire({
+                title: 'Actualización Requerida',
+                html: `
+                    <div style="text-align: center; padding: 20px;">
+                        <div style="font-size: 4rem; color: #2563eb; margin-bottom: 20px;">🔄</div>
+                        <h3 style="color: #ffffff; margin-bottom: 15px;">Nueva versión disponible</h3>
+                        ${info.version ? `<p style="color: #9ca3af; margin-bottom: 10px;"><strong>Versión:</strong> ${info.version}</p>` : ''}
+                        <p style="color: #9ca3af; margin-bottom: 20px;">
+                            Se ha detectado una nueva versión del sistema. Por seguridad y para obtener las últimas características, 
+                            debe actualizar antes de continuar.
+                        </p>
+                        <div style="background: rgba(255, 152, 0, 0.1); padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid rgba(255, 152, 0, 0.3);">
+                            <p style="color: #f59e0b; font-size: 0.9rem; margin: 0;">
+                                <strong>⚠️ El acceso está temporalmente bloqueado hasta completar la actualización</strong>
+                            </p>
+                        </div>
+                        <div class="update-progress" style="margin: 20px 0;">
+                            <div style="background: rgba(255, 255, 255, 0.1); height: 8px; border-radius: 4px; overflow: hidden;">
+                                <div id="progressBar" style="background: linear-gradient(90deg, #2563eb, #3b82f6); height: 100%; width: 0%; transition: width 0.3s ease; border-radius: 4px;"></div>
+                            </div>
+                            <p id="progressText" style="color: #9ca3af; font-size: 0.85rem; margin-top: 10px;">Iniciando descarga...</p>
+                            <p id="progressDetails" style="color: #6b7280; font-size: 0.75rem; margin-top: 5px;"></p>
+                        </div>
+                    </div>
+                `,
+                icon: null,
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showConfirmButton: false,
+                showCancelButton: false,
+                width: '520px',
+                background: '#1a1d23',
+                color: '#ffffff',
+                customClass: {
+                    popup: 'no-close-popup'
+                }
+            });
+        });
+        
+        // Manejar progreso de descarga
+        ipcRenderer.on('download_progress', (event, progress) => {
+            console.log('Progreso de descarga:', progress);
+            
+            const percent = Math.round(progress.percent || 0);
+            let message = `Descargando actualización... ${percent}%`;
+            let details = '';
+            
+            if (progress.transferred && progress.total) {
+                const transferredMB = formatBytes(progress.transferred);
+                const totalMB = formatBytes(progress.total);
+                details = `${transferredMB} de ${totalMB}`;
+                
+                if (progress.bytesPerSecond) {
+                    details += ` • ${formatSpeed(progress.bytesPerSecond)}`;
+                }
+            }
+            
+            updateProgressBar(percent, message);
+            
+            const progressDetails = document.getElementById('progressDetails');
+            if (progressDetails) {
+                progressDetails.textContent = details;
+            }
+        });
+        
+        // Manejar actualización descargada
+        ipcRenderer.on('update_downloaded', (event, info) => {
+            ipcRenderer.removeAllListeners('update_downloaded');
+            console.log('Actualización descargada:', info);
+            
+            updateProgressBar(100, 'Descarga completada');
+            
+            setTimeout(() => {
+                if (currentUpdateModal) {
+                    Swal.close();
+                }
+                
+                Swal.fire({
+                    title: 'Actualización Lista',
+                    html: `
+                        <div style="text-align: center; padding: 20px;">
+                            <div style="font-size: 4rem; color: #10b981; margin-bottom: 20px;">✅</div>
+                            <h3 style="color: #ffffff; margin-bottom: 15px;">Actualización descargada</h3>
+                            ${info.version ? `<p style="color: #9ca3af; margin-bottom: 10px;"><strong>Nueva versión:</strong> ${info.version}</p>` : ''}
+                            <p style="color: #9ca3af; margin-bottom: 20px;">
+                                La nueva versión ha sido descargada correctamente. 
+                                La aplicación se reiniciará para completar la instalación.
+                            </p>
+                            <div style="background: rgba(16, 185, 129, 0.1); padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid rgba(16, 185, 129, 0.3);">
+                                <p style="color: #10b981; font-size: 0.9rem; margin: 0;">
+                                    <strong>🎉 ¡Todo listo! El proceso tomará solo unos segundos</strong>
+                                </p>
+                            </div>
+                        </div>
+                    `,
+                    icon: null,
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                    confirmButtonText: 'Reiniciar Ahora',
+                    confirmButtonColor: '#10b981',
+                    showCancelButton: false,
+                    width: '480px',
+                    timer: 5000,
+                    timerProgressBar: true,
+                    background: '#1a1d23',
+                    color: '#ffffff'
+                }).then((result) => {
+                    if (result.isConfirmed || result.isDismissed) {
+                        ipcRenderer.send('restart_app');
+                    }
+                });
+            }, 1500);
+        });
+        
+        // Manejar errores de actualización
+        ipcRenderer.on('update_error', (event, error) => {
+            ipcRenderer.removeAllListeners('update_error');
+            console.error('Error de actualización:', error);
+            
+            if (currentUpdateModal) {
+                Swal.close();
+            }
+            
+            Swal.fire({
+                icon: 'error',
+                title: 'Error en la actualización',
+                html: `
+                    <div>
+                        <p style="color: #9ca3af;">Se produjo un error durante el proceso de actualización:</p>
+                        <div style="background: rgba(220, 38, 38, 0.1); padding: 12px; border-radius: 8px; margin: 15px 0; text-align: left; border: 1px solid rgba(220, 38, 38, 0.3);">
+                            <p style="color: #dc2626; font-size: 0.9rem; margin: 0; font-family: monospace;">${error.message}</p>
+                        </div>
+                        <p style="color: #9ca3af; font-size: 0.9rem;">
+                            Puedes continuar usando la aplicación. La actualización se intentará nuevamente en el próximo reinicio.
+                        </p>
+                    </div>
+                `,
+                confirmButtonText: 'Continuar',
+                confirmButtonColor: '#2563eb',
+                width: '500px',
+                background: '#1a1d23',
+                color: '#ffffff'
+            }).then(() => {
+                document.querySelector('.login-box').style.pointerEvents = 'auto';
+                document.querySelector('.login-box').style.opacity = '1';
+            });
+        });
+    </script>
 </body>
 </html>
