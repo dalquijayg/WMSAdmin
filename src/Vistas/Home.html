@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WMS - Panel Principal</title>
+    <link rel="stylesheet" href="../Diseño/Home.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <img src="../Imagenes/LogoWMS.png" alt="WMS Logo" class="sidebar-logo">
+            <h3>WMS Sistema</h3>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active">
+                <i class="fas fa-home"></i>
+                <span>Dashboard</span>
+            </a>
+            
+            <!-- Menú Pedidos con submenú -->
+            <div class="nav-item-group">
+                <a href="#" class="nav-item has-submenu" data-submenu="pedidos">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span>Pedidos</span>
+                    <i class="fas fa-chevron-down arrow-icon"></i>
+                </a>
+                <div class="submenu" id="submenu-pedidos">
+                    <a href="#" class="submenu-item" id="menuAsignarHojas">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Asignar Hojas</span>
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Menú Reportes con submenú -->
+            <div class="nav-item-group">
+                <a href="#" class="nav-item has-submenu" data-submenu="reportes">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Reportes</span>
+                    <i class="fas fa-chevron-down arrow-icon"></i>
+                </a>
+                <div class="submenu" id="submenu-reportes">
+                    <a href="#" class="submenu-item" id="menuReportes">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>Reporte</span>
+                    </a>
+                </div>
+            </div>
+        </nav>
+        
+        <div class="sidebar-footer">
+            <button class="btn-logout" id="btnLogout">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Cerrar Sesión</span>
+            </button>
+        </div>
+    </aside>
+    
+    <!-- Contenido principal -->
+    <main class="main-content">
+        <!-- Header -->
+        <header class="top-header">
+            <div class="header-left">
+                <button class="btn-menu" id="btnToggleSidebar">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h1>Panel de Control</h1>
+            </div>
+            
+            <div class="header-right">
+                <div class="user-info">
+                    <div class="user-details">
+                        <span class="user-name" id="userName">Usuario</span>
+                        <span class="user-role">Supervisor</span>
+                    </div>
+                    <div class="user-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Contenido -->
+        <div class="content">
+            <!-- Cards de estadísticas -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);">
+                        <i class="fas fa-clipboard-list"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>Pedidos Activos</h3>
+                        <p class="stat-value" id="statPedidosActivos">0</p>
+                        <span class="stat-change positive" id="changePedidosActivos">
+                            <i class="fas fa-arrow-up"></i> 0% vs ayer
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>Completados Hoy</h3>
+                        <p class="stat-value" id="statCompletadosHoy">0</p>
+                        <span class="stat-change positive" id="changeCompletadosHoy">
+                            <i class="fas fa-arrow-up"></i> 0% vs ayer
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>Pendientes</h3>
+                        <p class="stat-value" id="statPendientes">0</p>
+                        <span class="stat-change" id="changePendientes">
+                            <i class="fas fa-minus"></i> Sin cambios
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>Preparadores Activos</h3>
+                        <p class="stat-value" id="statPreparadoresActivos">0</p>
+                        <span class="stat-change" id="changePreparadores">
+                            <i class="fas fa-minus"></i> Sin cambios
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Gráficos y tablas -->
+            <div class="content-grid">
+                <!-- Actividad reciente -->
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3>Actividad Reciente</h3>
+                        <button class="btn-card-action">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="activity-list" id="activityList">
+                            <!-- Las actividades se cargarán dinámicamente desde JS -->
+                            <div class="loading-message">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                <span>Cargando actividades...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Preparadores activos -->
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3>Preparadores Activos</h3>
+                        <button class="btn-card-action">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="preparadores-list" id="preparadoresList">
+                            <!-- Los preparadores se cargarán dinámicamente desde JS -->
+                            <div class="loading-message">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                <span>Cargando preparadores...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <script src="../Logica/Home.js"></script>
+</body>
+</html>

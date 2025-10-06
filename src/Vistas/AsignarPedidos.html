@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WMS - Asignar Pedidos</title>
+    <link rel="stylesheet" href="../Diseño/Pedidos/AsignarPedidos.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="header-left">
+                <img src="../Imagenes/LogoWMS.png" alt="WMS Logo" class="header-logo">
+                <div class="header-title">
+                    <h1>Asignar Pedidos</h1>
+                    <p>Gestión de preparación de pedidos</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <button class="btn-refresh" id="btnRefresh" title="Actualizar datos">
+                    <i class="fas fa-sync-alt"></i>
+                    <span>Actualizar</span>
+                </button>
+                <button class="btn-close" id="btnClose" title="Cerrar ventana">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navegación por pestañas -->
+    <nav class="tabs-navigation">
+        <button class="tab-button active" data-tab="pendientes">
+            <i class="fas fa-clock"></i>
+            <span>Pendientes por Preparar</span>
+            <span class="tab-badge" id="badgePendientes">0</span>
+        </button>
+        <button class="tab-button" data-tab="preparacion">
+            <i class="fas fa-box-open"></i>
+            <span>En Preparación</span>
+            <span class="tab-badge" id="badgePreparacion">0</span>
+        </button>
+    </nav>
+
+    <!-- Contenido principal -->
+    <main class="main-content">
+        
+        <!-- Tab: Pedidos Pendientes -->
+        <section class="tab-content active" id="tab-pendientes">
+            <div class="content-header">
+                <div class="header-info">
+                    <h2>
+                        <i class="fas fa-clock"></i>
+                        Pedidos Pendientes por Preparar
+                    </h2>
+                    <p>Estos pedidos están listos para iniciar su preparación</p>
+                </div>
+                <div class="header-stats">
+                    <div class="stat-card">
+                        <span class="stat-value" id="countPendientes">0</span>
+                        <span class="stat-label">Pedidos</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="table-wrapper">
+                <div class="table-container">
+                    <table class="data-table" id="tablePendientes">
+                        <thead>
+                            <tr>
+                                <th>ID Pedido</th>
+                                <th>Fecha</th>
+                                <th>Empresa</th>
+                                <th>Departamento</th>
+                                <th>Cantidad Fardos</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bodyPendientes">
+                            <tr>
+                                <td colspan="6" class="loading-cell">
+                                    <div class="loading-message">
+                                        <i class="fas fa-spinner fa-spin"></i>
+                                        <span>Cargando pedidos pendientes...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tab: Pedidos en Preparación -->
+        <section class="tab-content" id="tab-preparacion">
+            <div class="content-header">
+                <div class="header-info">
+                    <h2>
+                        <i class="fas fa-box-open"></i>
+                        Pedidos en Preparación
+                    </h2>
+                    <p>Pedidos que actualmente están siendo preparados</p>
+                </div>
+                <div class="header-stats">
+                    <div class="stat-card">
+                        <span class="stat-value" id="countPreparacion">0</span>
+                        <span class="stat-label">Pedidos</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="table-wrapper">
+                <div class="table-container">
+                    <table class="data-table" id="tablePreparacion">
+                        <thead>
+                            <tr>
+                                <th>ID Pedido</th>
+                                <th>Fecha</th>
+                                <th>Empresa</th>
+                                <th>Departamento</th>
+                                <th>Total Items</th>
+                                <th>Total Hojas</th>
+                                <th>Progreso</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bodyPreparacion">
+                            <tr>
+                                <td colspan="8" class="loading-cell">
+                                    <div class="loading-message">
+                                        <i class="fas fa-spinner fa-spin"></i>
+                                        <span>Cargando pedidos en preparación...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script src="../Logica/Pedidios/AsignarPedidos.js"></script>
+</body>
+</html>

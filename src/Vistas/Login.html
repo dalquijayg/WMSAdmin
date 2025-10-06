@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WMS - Sistema de Gestión de Bodega</title>
+    <link rel="stylesheet" href="../Diseño/Login.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <!-- Logo de la empresa -->
+    <div class="brand-container">
+        <img src="../Imagenes/LogoWMS.png" alt="WMS Logo" class="brand-logo">
+    </div>
+    
+    <!-- Elementos decorativos de fondo -->
+    <div class="bg-decoration circle circle1"></div>
+    <div class="bg-decoration circle circle2"></div>
+    <div class="bg-decoration circle circle3"></div>
+    <div class="bg-decoration circle circle4"></div>
+    
+    <div class="bg-decoration square square1"></div>
+    <div class="bg-decoration square square2"></div>
+    <div class="bg-decoration square square3"></div>
+    
+    <div class="container">
+        <div class="login-box">
+            <div class="login-header">
+                <div class="icon-container">
+                    <i class="fas fa-warehouse"></i>
+                </div>
+                <h2>Sistema WMS</h2>
+                <p class="subtitle">Supervisión de Operaciones</p>
+            </div>
+            
+            <div class="color-strip">
+                <div class="strip-item strip-blue"></div>
+                <div class="strip-item strip-blue"></div>
+                <div class="strip-item strip-blue"></div>
+            </div>
+            
+            <form id="loginForm">
+                <div class="input-container">
+                    <label for="usuario">
+                        <i class="fas fa-user"></i> Usuario
+                    </label>
+                    <input type="text" id="usuario" required autocomplete="username">
+                </div>
+                
+                <div class="input-container">
+                    <label for="password">
+                        <i class="fas fa-lock"></i> Contraseña
+                    </label>
+                    <div class="password-wrapper">
+                        <input type="password" id="password" required autocomplete="current-password">
+                        <button type="button" class="toggle-password" id="togglePassword">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn-login">
+                    <span>INGRESAR</span>
+                    <i class="fas fa-arrow-right"></i>
+                </button>
+            </form>
+            
+            <div class="footer-text">
+                <p>Sistema de Gestión de Bodega v1.0.0</p>
+            </div>
+        </div>
+    </div>
+    
+    <script src="../Logica/Login.js"></script>
+</body>
+</html>
