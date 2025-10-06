@@ -42,7 +42,7 @@ function createWindow() {
 
     // Verificar actualizaciones después de cargar
     mainWindow.webContents.once('dom-ready', () => {
-        if (process.env.NODE_ENV !== 'production') {
+        if (process.env.NODE_ENV === 'production') {  // Solo en producción
             autoUpdater.checkForUpdatesAndNotify();
         }
     });
