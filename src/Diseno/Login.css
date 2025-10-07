@@ -503,7 +503,6 @@ body {
         opacity: 0.03;
     }
 }
-
 /* Estilos para modales de actualización */
 .swal2-popup.no-close-popup .swal2-close {
     display: none !important;
@@ -511,13 +510,14 @@ body {
 
 .update-progress {
     user-select: none;
+    margin: 20px 0;
 }
 
-#progressBar {
+.update-progress #progressBar {
     position: relative;
 }
 
-#progressBar::after {
+.update-progress #progressBar::after {
     content: '';
     position: absolute;
     top: 0;
@@ -537,5 +537,13 @@ body {
     }
     100% {
         transform: translateX(100%);
+    }
+}
+
+/* Responsive para modales */
+@media screen and (max-width: 768px) {
+    .swal2-popup {
+        width: 95% !important;
+        max-width: 95% !important;
     }
 }

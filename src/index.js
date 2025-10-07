@@ -3,20 +3,20 @@ const path = require('path');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
 
-// Configuración de logs
+// Configurar logging
 log.transports.file.resolvePathFn = () => path.join(app.getPath('userData'), 'logs/main.log');
 log.log("Versión de la App: " + app.getVersion());
 
-// Variables globales
-let mainWindow;
-let asignarHojasWindow = null;
-let PedidosreportesWindow = null;
-let updateInProgress = false;
-
-// Habilitar recarga automática solo en desarrollo
 if (process.env.NODE_ENV !== 'production') {
     require('electron-reload')(__dirname);
 }
+
+let mainWindow;
+let asignarHojasWindow = null;
+let PedidosreportesWindow = null;
+
+// Variable para controlar el estado de actualización
+let updateInProgress = false;
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -27,54 +27,41 @@ function createWindow() {
         icon: path.join(__dirname, 'LogoWMS.ico'),
         autoHideMenuBar: true,
         width: 1200,
-        height: 800,
-        backgroundColor: '#1a1d23',
-        show: false
+        height: 800
     });
 
     mainWindow.maximize();
     mainWindow.loadURL(`file://${__dirname}/Vistas/Login.html`);
 
-    // Mostrar ventana cuando esté lista
-    mainWindow.once('ready-to-show', () => {
-        mainWindow.show();
-    });
-
-    // Verificar actualizaciones después de cargar
     mainWindow.webContents.once('dom-ready', () => {
-        if (process.env.NODE_ENV === 'production') {  // Solo en producción
+        // Solo verificar actualizaciones en producción
+        if (process.env.NODE_ENV !== 'development') {
             autoUpdater.checkForUpdatesAndNotify();
         }
     });
 
-    // Prevenir cierre durante actualización
+    // Prevenir el cierre durante una actualización
     mainWindow.on('close', (event) => {
         if (updateInProgress) {
             event.preventDefault();
             dialog.showMessageBoxSync(mainWindow, {
                 type: 'info',
                 title: 'Actualización en progreso',
-                message: 'No se puede cerrar la aplicación mientras se está actualizando. Por favor espera.',
+                message: 'No se puede cerrar la aplicación mientras se está actualizando. Por favor espera a que termine el proceso.',
                 buttons: ['Entendido']
             });
         }
-    });
-
-    mainWindow.on('closed', () => {
-        mainWindow = null;
     });
 }
 
 // Función helper para mostrar alerta de actualización en progreso
 function showUpdateInProgressDialog() {
-    if (mainWindow) {
-        dialog.showMessageBoxSync(mainWindow, {
-            type: 'warning',
-            title: 'Actualización en progreso',
-            message: 'No se pueden abrir nuevas ventanas mientras se actualiza. Por favor espera.',
-            buttons: ['Entendido']
-        });
-    }
+    dialog.showMessageBoxSync(mainWindow, {
+        type: 'warning',
+        title: 'Actualización en progreso',
+        message: 'No se pueden abrir nuevas ventanas mientras se actualiza la aplicación. Por favor espera.',
+        buttons: ['Entendido']
+    });
 }
 
 function createAsignarHojasWindow() {
@@ -129,7 +116,7 @@ function createPedidosReportesWindow() {
             contextIsolation: false,
         },
         icon: path.join(__dirname, 'Imagenes/logo-wms.png'),
-        title: 'WMS - Pedidos y Reportes',
+        title: 'WMS - Reportes de Pedidos',
         autoHideMenuBar: true,
         backgroundColor: '#1a1d23'
     });
@@ -141,8 +128,7 @@ function createPedidosReportesWindow() {
     });
 }
 
-// ===== EVENTOS DE AUTO-UPDATER =====
-
+// Configurar eventos del auto-updater
 autoUpdater.on('checking-for-update', () => {
     log.info('Verificando actualizaciones...');
 });
@@ -177,9 +163,9 @@ autoUpdater.on('error', (err) => {
 });
 
 autoUpdater.on('download-progress', (progressObj) => {
-    let log_message = `Velocidad de descarga: ${progressObj.bytesPerSecond}`;
-    log_message += ` - Descargado ${progressObj.percent}%`;
-    log_message += ` (${progressObj.transferred}/${progressObj.total})`;
+    let log_message = "Velocidad de descarga: " + progressObj.bytesPerSecond;
+    log_message = log_message + ' - Descargado ' + progressObj.percent + '%';
+    log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
     log.info(log_message);
     
     if (mainWindow && mainWindow.webContents) {
@@ -205,8 +191,13 @@ autoUpdater.on('update-downloaded', (info) => {
     }
 });
 
-// ===== IPC LISTENERS =====
+// Manejar solicitud de reinicio
+ipcMain.on('restart_app', () => {
+    log.info("Reiniciando app para actualización...");
+    autoUpdater.quitAndInstall();
+});
 
+// IPC Listeners
 ipcMain.on('open_asignar_hojas', () => {
     createAsignarHojasWindow();
 });
@@ -214,14 +205,6 @@ ipcMain.on('open_asignar_hojas', () => {
 ipcMain.on('open_pedidos_reportes', () => {
     createPedidosReportesWindow();
 });
-
-// Manejar solicitud de reinicio
-ipcMain.on('restart_app', () => {
-    log.info("Reiniciando aplicación para actualizar...");
-    autoUpdater.quitAndInstall();
-});
-
-// ===== APP EVENTS =====
 
 app.on('ready', createWindow);
 
