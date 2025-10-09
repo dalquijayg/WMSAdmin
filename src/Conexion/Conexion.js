@@ -6,7 +6,7 @@ const dbConfig = {
     user: 'compras',
     port: 3306,
     password: 'bode.24451988',
-    database: 'superpos_preubas',
+    database: 'superpos',
     charset: 'utf8mb4',
     timezone: '+00:00',
     
