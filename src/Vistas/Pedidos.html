@@ -1,1 +1,176 @@
-<div>hola</div>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WMS - Reportes de Pedidos</title>
+    <link rel="stylesheet" href="../Diseno/Reportes/Pedidos.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Chart.js para gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="header-left">
+                <img src="../Imagenes/LogoWMS.png" alt="WMS Logo" class="header-logo">
+                <div class="header-title">
+                    <h1>Reportes de Pedidos</h1>
+                    <p>Análisis y estadísticas de preparación</p>
+                </div>
+                <div class="header-filters">
+                    <div class="date-filter-compact">
+                        <label>
+                            <i class="fas fa-calendar"></i>
+                            Desde:
+                        </label>
+                        <input type="date" id="fechaDesde" class="input-date">
+                    </div>
+                    <div class="date-filter-compact">
+                        <label>
+                            <i class="fas fa-calendar"></i>
+                            Hasta:
+                        </label>
+                        <input type="date" id="fechaHasta" class="input-date">
+                    </div>
+                    <button class="btn-filter" id="btnFiltrar">
+                        <i class="fas fa-filter"></i>
+                        Filtrar
+                    </button>
+                </div>
+            </div>
+            
+            <div class="header-stats">
+                <div class="stat-card-mini card-pendientes">
+                    <i class="fas fa-clock"></i>
+                    <div class="stat-mini-info">
+                        <span class="stat-mini-value" id="countPorPreparar">0</span>
+                        <span class="stat-mini-label">Por Preparar</span>
+                    </div>
+                </div>
+
+                <div class="stat-card-mini card-proceso">
+                    <i class="fas fa-box-open"></i>
+                    <div class="stat-mini-info">
+                        <span class="stat-mini-value" id="countEnPreparacion">0</span>
+                        <span class="stat-mini-label">En Preparación</span>
+                    </div>
+                </div>
+
+                <div class="stat-card-mini card-completados">
+                    <i class="fas fa-check-circle"></i>
+                    <div class="stat-mini-info">
+                        <span class="stat-mini-value" id="countCompletados">0</span>
+                        <span class="stat-mini-label">Completados</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="header-right">
+                <button class="btn-export" id="btnExportExcel" title="Exportar a Excel">
+                    <i class="fas fa-file-excel"></i>
+                    <span>Excel</span>
+                </button>
+                <button class="btn-refresh" id="btnRefresh" title="Actualizar datos">
+                    <i class="fas fa-sync-alt"></i>
+                    <span>Actualizar</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        
+        <!-- Sección de Gráficos -->
+        <section class="charts-section">
+            <!-- Columna Izquierda: 3 Gráficos -->
+            <div class="charts-column">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3><i class="fas fa-file-alt"></i> Hojas Preparadas</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="chartHojas"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3><i class="fas fa-barcode"></i> SKUs Preparados</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="chartSKUs"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3><i class="fas fa-boxes"></i> Fardos Preparados</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="chartFardos"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Tabla de Datos -->
+            <div class="table-column">
+                <div class="table-card">
+                    <div class="table-header">
+                        <h3><i class="fas fa-users"></i> Detalle por Preparador</h3>
+                    </div>
+                    
+                    <div class="table-wrapper">
+                        <table class="data-table" id="tablePreparadores">
+                            <thead>
+                                <tr>
+                                    <th>Preparador</th>
+                                    <th>Hojas</th>
+                                    <th>SKUs</th>
+                                    <th>Fardos</th>
+                                    <th>Pedidos</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bodyPreparadores">
+                                <tr>
+                                    <td colspan="5" class="loading-cell">
+                                        <div class="loading-message">
+                                            <i class="fas fa-spinner fa-spin"></i>
+                                            <span>Cargando datos...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Totales -->
+                    <div class="table-footer">
+                        <div class="total-item">
+                            <span class="total-label">Total Hojas:</span>
+                            <span class="total-value" id="totalHojas">0</span>
+                        </div>
+                        <div class="total-item">
+                            <span class="total-label">Total SKUs:</span>
+                            <span class="total-value" id="totalSKUs">0</span>
+                        </div>
+                        <div class="total-item">
+                            <span class="total-label">Total Fardos:</span>
+                            <span class="total-value" id="totalFardos">0</span>
+                        </div>
+                        <div class="total-item">
+                            <span class="total-label">Total Pedidos:</span>
+                            <span class="total-value" id="totalPedidos">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script src="../Logica/Reportes/Pedidos.js"></script>
+</body>
+</html>

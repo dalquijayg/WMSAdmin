@@ -179,6 +179,7 @@ async function cargarPedidosEnPreparacion() {
                 INNER JOIN departamentos ON pedidostienda_bodega.Departamento = departamentos.Id
             WHERE
                 pedidostienda_bodega.Estado = 5
+                AND pedidostienda_bodega.Nohojas > 0  -- AGREGADO: Filtrar solo con hojas
             ORDER BY pedidostienda_bodega.Fecha DESC`
         );
         
@@ -186,59 +187,64 @@ async function cargarPedidosEnPreparacion() {
         
         // Obtener progreso de cada pedido basado en productos
         const pedidosConProgreso = await Promise.all(pedidos.map(async (pedido) => {
-            // Contar total de SKUs del pedido
-            const resultadoTotal = await connection.query(
-                `SELECT COUNT(*) as total
-                FROM detallepedidostienda_bodega
-                WHERE IdConsolidado = ?`,
-                [pedido.IdPedidos]
-            );
-            const totalSKUs = normalizarResultado(resultadoTotal)[0]?.total || 0;
-            
-            // Contar productos preparados (EstadoPreparacionproducto > 0)
-            const resultadoPreparados = await connection.query(
-                `SELECT COUNT(*) as total
-                FROM detallepedidostienda_bodega
-                WHERE IdConsolidado = ? AND EstadoPreparacionproducto > 0`,
-                [pedido.IdPedidos]
-            );
-            const productosPreparados = normalizarResultado(resultadoPreparados)[0]?.total || 0;
-            
-            // Contar hojas en proceso (para el indicador visual)
-            const resultadoEnProceso = await connection.query(
-                `SELECT COUNT(*) as total
-                FROM PreparacionPedidos
-                WHERE IdPedido = ? AND FechaHoraInicio IS NOT NULL AND FechaHorafinalizo IS NULL`,
-                [pedido.IdPedidos]
-            );
-            const hojasEnProceso = normalizarResultado(resultadoEnProceso)[0]?.total || 0;
-            
-            const porcentaje = totalSKUs > 0 ? Math.round((productosPreparados / totalSKUs) * 100) : 0;
-            
-            return {
-                ...pedido,
-                totalSKUs,
-                productosPreparados,
-                hojasEnProceso,
-                porcentaje
-            };
-        }));
+        // Contar total de SKUs del pedido
+        const resultadoTotal = await connection.query(
+            `SELECT COUNT(*) as total
+            FROM detallepedidostienda_bodega
+            WHERE IdConsolidado = ?`,
+            [pedido.IdPedidos]
+        );
+        const totalSKUs = normalizarResultado(resultadoTotal)[0]?.total || 0;
+        
+        // CORREGIDO: Excluir estado 4 del conteo de preparados
+        const resultadoPreparados = await connection.query(
+            `SELECT COUNT(*) as total
+            FROM detallepedidostienda_bodega
+            WHERE IdConsolidado = ? 
+            AND EstadoPreparacionproducto > 0 
+            AND EstadoPreparacionproducto != 4`,  // <-- AGREGADO: Excluir estado 4
+            [pedido.IdPedidos]
+        );
+        const productosPreparados = normalizarResultado(resultadoPreparados)[0]?.total || 0;
+        
+        // Contar hojas en proceso (para el indicador visual)
+        const resultadoEnProceso = await connection.query(
+            `SELECT COUNT(*) as total
+            FROM PreparacionPedidos
+            WHERE IdPedido = ? AND FechaHoraInicio IS NOT NULL AND FechaHorafinalizo IS NULL`,
+            [pedido.IdPedidos]
+        );
+        const hojasEnProceso = normalizarResultado(resultadoEnProceso)[0]?.total || 0;
+        
+        const porcentaje = totalSKUs > 0 ? Math.round((productosPreparados / totalSKUs) * 100) : 0;
+        
+        return {
+            ...pedido,
+            totalSKUs,
+            productosPreparados,
+            hojasEnProceso,
+            porcentaje
+        };
+    }));
+        
+        // Filtrar nulls en caso de que algún pedido no tenga hojas
+        const pedidosFiltrados = pedidosConProgreso.filter(pedido => pedido !== null);
         
         await connection.close();
         
-        // Actualizar contadores
-        document.getElementById('countPreparacion').textContent = pedidosConProgreso.length;
-        document.getElementById('badgePreparacion').textContent = pedidosConProgreso.length;
+        // Actualizar contadores con pedidos filtrados
+        document.getElementById('countPreparacion').textContent = pedidosFiltrados.length;
+        document.getElementById('badgePreparacion').textContent = pedidosFiltrados.length;
         
         // Renderizar tabla
         const tbody = document.getElementById('bodyPreparacion');
         
-        if (pedidosConProgreso.length === 0) {
+        if (pedidosFiltrados.length === 0) {
             tbody.innerHTML = `
                 <tr>
                     <td colspan="8" class="empty-state">
                         <i class="fas fa-inbox"></i>
-                        <p>No hay pedidos en preparación actualmente</p>
+                        <p>No hay pedidos en preparación con hojas asignadas</p>
                     </td>
                 </tr>
             `;
@@ -247,7 +253,7 @@ async function cargarPedidosEnPreparacion() {
         
         tbody.innerHTML = '';
         
-        pedidosConProgreso.forEach(pedido => {
+        pedidosFiltrados.forEach(pedido => {
             const tr = document.createElement('tr');
             const fechaFormateada = formatearFecha(pedido.Fecha);
             
@@ -267,7 +273,18 @@ async function cargarPedidosEnPreparacion() {
                 <td class="cell-empresa">${pedido.NombreEmpresa}</td>
                 <td>${pedido.NombreDepartamento || pedido.Departamento}</td>
                 <td class="cell-cantidad">${pedido.TotalCantidad} items</td>
-                <td class="cell-cantidad">${pedido.Nohojas || 0} hojas</td>
+                <td class="cell-cantidad">
+                    <span style="
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 4px;
+                        ${pedido.Nohojas > 0 ? 'color: #10b981;' : 'color: #f59e0b;'}
+                        font-weight: 600;
+                    ">
+                        <i class="fas fa-file-alt"></i>
+                        ${pedido.Nohojas || 0} hojas
+                    </span>
+                </td>
                 <td>
                     <div style="min-width: 140px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
@@ -1143,33 +1160,34 @@ async function verProgresoPreparacion(idPedido) {
         
         // Obtener progreso de cada hoja
         const hojasConProgreso = await Promise.all(hojas.map(async (hoja) => {
-            let productosPreparados = 0;
-            
-            if (hoja.IdUsuario) {
-                // Si tiene usuario asignado, contar productos preparados
-                const resultado = await connection.query(
-                    `SELECT COUNT(*) as total
-                    FROM detallepedidostienda_bodega
-                    WHERE
-                        detallepedidostienda_bodega.EstadoPreparacionproducto > 0 AND
-                        detallepedidostienda_bodega.IdConsolidado = ? AND
-                        detallepedidostienda_bodega.NoHoja = ?`,
-                    [idPedido, hoja.NoHoja]
-                );
-                const resultadoNormalizado = normalizarResultado(resultado);
-                productosPreparados = resultadoNormalizado[0]?.total || 0;
-            }
-            
-            const totalProductos = hoja.TotalSkus;
-            const porcentaje = totalProductos > 0 ? Math.round((productosPreparados / totalProductos) * 100) : 0;
-            
-            return {
-                ...hoja,
-                totalProductos,
-                productosPreparados,
-                porcentaje
-            };
-        }));
+        let productosPreparados = 0;
+        
+        if (hoja.IdUsuario) {
+            // CORREGIDO: Excluir estado 4 del conteo
+            const resultado = await connection.query(
+                `SELECT COUNT(*) as total
+                FROM detallepedidostienda_bodega
+                WHERE
+                    IdConsolidado = ? AND
+                    NoHoja = ? AND
+                    EstadoPreparacionproducto > 0 AND
+                    EstadoPreparacionproducto != 4`,  // <-- AGREGADO: Excluir estado 4
+                [idPedido, hoja.NoHoja]
+            );
+            const resultadoNormalizado = normalizarResultado(resultado);
+            productosPreparados = resultadoNormalizado[0]?.total || 0;
+        }
+        
+        const totalProductos = hoja.TotalSkus;
+        const porcentaje = totalProductos > 0 ? Math.round((productosPreparados / totalProductos) * 100) : 0;
+        
+        return {
+            ...hoja,
+            totalProductos,
+            productosPreparados,
+            porcentaje
+        };
+    }));
         
         await connection.close();
         
