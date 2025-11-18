@@ -349,13 +349,26 @@ function configurarEventos() {
     });
     
     document.getElementById('btnLogout').addEventListener('click', confirmarCerrarSesion);
+    
+    // Event listeners para los submenús
     document.getElementById('menuAsignarHojas').addEventListener('click', (e) => {
         e.preventDefault();
         abrirAsignarHojas();
     });
+    
+    document.getElementById('menuAsignarTarimas').addEventListener('click', (e) => {
+        e.preventDefault();
+        abrirAsignarTarimas();
+    });
+    
     document.getElementById('menuReportes').addEventListener('click', (e) => {
         e.preventDefault();
         abrirPedidosReportes();
+    });
+    
+    document.getElementById('menuReporteRechequeadores').addEventListener('click', (e) => {
+        e.preventDefault();
+        abrirReporteRechequeadores();
     });
 }
 
@@ -566,6 +579,129 @@ async function abrirPedidosReportes() {
                     <div style="background: rgba(220, 38, 38, 0.1); padding: 15px; border-radius: 8px; border-left: 4px solid #dc2626;">
                         <p style="color: #dc2626; font-size: 0.9rem; margin: 0;">
                             <strong>Código de permiso requerido:</strong> 201<br>
+                            Contacta al administrador para solicitar acceso.
+                        </p>
+                    </div>
+                </div>
+            `,
+            confirmButtonText: 'Entendido',
+            confirmButtonColor: '#dc2626',
+            background: '#1a1d23',
+            color: '#ffffff',
+            width: '450px'
+        });
+    }
+}
+// Función para abrir ventana de Asignar Tarimas
+async function abrirAsignarTarimas() {
+    const loadingSwal = Swal.fire({
+        title: 'Verificando permisos...',
+        html: `
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
+                <div class="spinner" style="
+                    border: 4px solid rgba(37, 99, 235, 0.1);
+                    border-top: 4px solid #2563eb;
+                    border-radius: 50%;
+                    width: 50px;
+                    height: 50px;
+                    animation: spin 1s linear infinite;
+                "></div>
+            </div>
+            <style>
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            </style>
+        `,
+        showConfirmButton: false,
+        allowOutsideClick: false,
+        background: '#1a1d23',
+        color: '#ffffff'
+    });
+    
+    // Verificar permiso (Código 202 para Asignar Tarimas)
+    const tienePermiso = await verificarPermiso(202);
+    
+    loadingSwal.close();
+    
+    if (tienePermiso) {
+        ipcRenderer.send('open_asignar_tarimas');
+    } else {
+        await Swal.fire({
+            icon: 'error',
+            title: 'Acceso Denegado',
+            html: `
+                <div style="text-align: center;">
+                    <div style="font-size: 3rem; margin-bottom: 15px;">🔒</div>
+                    <p style="color: #9ca3af; margin-bottom: 15px;">
+                        No tienes permisos para acceder a esta sección.
+                    </p>
+                    <div style="background: rgba(220, 38, 38, 0.1); padding: 15px; border-radius: 8px; border-left: 4px solid #dc2626;">
+                        <p style="color: #dc2626; font-size: 0.9rem; margin: 0;">
+                            <strong>Código de permiso requerido:</strong> 202<br>
+                            Contacta al administrador para solicitar acceso.
+                        </p>
+                    </div>
+                </div>
+            `,
+            confirmButtonText: 'Entendido',
+            confirmButtonColor: '#dc2626',
+            background: '#1a1d23',
+            color: '#ffffff',
+            width: '450px'
+        });
+    }
+}
+
+// Función para abrir ventana de Reporte Rechequeadores
+async function abrirReporteRechequeadores() {
+    const loadingSwal = Swal.fire({
+        title: 'Verificando permisos...',
+        html: `
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
+                <div class="spinner" style="
+                    border: 4px solid rgba(37, 99, 235, 0.1);
+                    border-top: 4px solid #2563eb;
+                    border-radius: 50%;
+                    width: 50px;
+                    height: 50px;
+                    animation: spin 1s linear infinite;
+                "></div>
+            </div>
+            <style>
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            </style>
+        `,
+        showConfirmButton: false,
+        allowOutsideClick: false,
+        background: '#1a1d23',
+        color: '#ffffff'
+    });
+    
+    // Verificar permiso (Código 203 para Reporte Rechequeadores)
+    const tienePermiso = await verificarPermiso(203);
+    
+    loadingSwal.close();
+    
+    if (tienePermiso) {
+        ipcRenderer.send('open_reporte_rechequeadores');
+    } else {
+        await Swal.fire({
+            icon: 'error',
+            title: 'Acceso Denegado',
+            html: `
+                <div style="text-align: center;">
+                    <div style="font-size: 3rem; margin-bottom: 15px;">🔒</div>
+                    <p style="color: #9ca3af; margin-bottom: 15px;">
+                        No tienes permisos para acceder a esta sección.
+                    </p>
+                    <div style="background: rgba(220, 38, 38, 0.1); padding: 15px; border-radius: 8px; border-left: 4px solid #dc2626;">
+                        <p style="color: #dc2626; font-size: 0.9rem; margin: 0;">
+                            <strong>Código de permiso requerido:</strong> 203<br>
                             Contacta al administrador para solicitar acceso.
                         </p>
                     </div>

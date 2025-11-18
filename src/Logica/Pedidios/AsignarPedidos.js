@@ -2,6 +2,9 @@ const { connectionString } = require('../Conexion/Conexion');
 const Swal = require('sweetalert2');
 const { ipcRenderer } = require('electron');
 
+// Variable global para almacenar todos los pedidos pendientes
+let todosLosPedidosPendientes = [];
+
 // Función auxiliar para normalizar resultados de query
 function normalizarResultado(resultado) {
     if (Array.isArray(resultado)) {
@@ -21,10 +24,104 @@ document.addEventListener('DOMContentLoaded', () => {
     cargarDatos();
     configurarEventos();
     configurarTabs();
+    configurarBusquedaEmpresa();
     
     // Actualizar datos cada 30 segundos
     setInterval(cargarDatos, 30000);
 });
+
+// Configurar búsqueda de empresa
+function configurarBusquedaEmpresa() {
+    const inputBuscar = document.getElementById('inputBuscarEmpresa');
+    const btnLimpiar = document.getElementById('btnLimpiarBusqueda');
+    
+    if (!inputBuscar || !btnLimpiar) return;
+    
+    // Búsqueda en tiempo real con debounce
+    let timeoutBusqueda;
+    inputBuscar.addEventListener('input', () => {
+        clearTimeout(timeoutBusqueda);
+        timeoutBusqueda = setTimeout(() => {
+            filtrarPedidosPorEmpresa();
+        }, 300); // Esperar 300ms después de que el usuario deje de escribir
+        
+        // Mostrar/ocultar botón de limpiar
+        if (inputBuscar.value.trim() !== '') {
+            btnLimpiar.style.display = 'flex';
+        } else {
+            btnLimpiar.style.display = 'none';
+        }
+    });
+    
+    // Botón limpiar búsqueda
+    btnLimpiar.addEventListener('click', () => {
+        inputBuscar.value = '';
+        btnLimpiar.style.display = 'none';
+        filtrarPedidosPorEmpresa();
+        inputBuscar.focus();
+    });
+    
+    // Búsqueda al presionar Enter
+    inputBuscar.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            filtrarPedidosPorEmpresa();
+        }
+    });
+}
+
+// Filtrar pedidos por empresa con búsqueda inteligente
+function filtrarPedidosPorEmpresa() {
+    const inputBuscar = document.getElementById('inputBuscarEmpresa');
+    const termino = (inputBuscar?.value || '').toLowerCase().trim();
+    
+    // Si no hay término de búsqueda, mostrar todos
+    if (termino === '') {
+        renderizarTablaPendientes(todosLosPedidosPendientes);
+        return;
+    }
+    
+    // Eliminar espacios múltiples y crear patrón de búsqueda flexible
+    const palabrasBusqueda = termino.split(/\s+/).filter(p => p.length > 0);
+    
+    // Filtrar pedidos
+    const pedidosFiltrados = todosLosPedidosPendientes.filter(pedido => {
+        const nombreEmpresa = (pedido.NombreEmpresa || '').toLowerCase();
+        let coincide = false;
+        
+        // Método 1: Búsqueda por coincidencia de todas las palabras
+        const todasCoinciden = palabrasBusqueda.every(palabra => 
+            nombreEmpresa.includes(palabra)
+        );
+        
+        if (todasCoinciden) {
+            coincide = true;
+        } else {
+            // Método 2: Búsqueda por iniciales
+            const palabrasNombre = nombreEmpresa.split(/\s+/).filter(p => p.length > 0);
+            const iniciales = palabrasNombre.map(p => p.charAt(0)).join('');
+            
+            if (iniciales.includes(termino.replace(/\s+/g, ''))) {
+                coincide = true;
+            } else {
+                // Método 3: Búsqueda flexible (permite omitir palabras intermedias)
+                let indice = 0;
+                for (let palabra of palabrasBusqueda) {
+                    indice = nombreEmpresa.indexOf(palabra, indice);
+                    if (indice === -1) break;
+                }
+                if (indice !== -1) {
+                    coincide = true;
+                }
+            }
+        }
+        
+        return coincide;
+    });
+    
+    // Renderizar resultados filtrados
+    renderizarTablaPendientes(pedidosFiltrados);
+}
 
 // Configurar sistema de pestañas
 function configurarTabs() {
@@ -98,53 +195,15 @@ async function cargarPedidosPendientes() {
         
         pedidos = normalizarResultado(pedidos);
         
-        // Actualizar contadores
+        // Guardar todos los pedidos en la variable global
+        todosLosPedidosPendientes = pedidos;
+        
+        // Actualizar contadores con el total
         document.getElementById('countPendientes').textContent = pedidos.length;
         document.getElementById('badgePendientes').textContent = pedidos.length;
         
-        // Renderizar tabla
-        const tbody = document.getElementById('bodyPendientes');
-        
-        if (pedidos.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="6" class="empty-state">
-                        <i class="fas fa-check-circle"></i>
-                        <p>No hay pedidos pendientes por preparar</p>
-                    </td>
-                </tr>
-            `;
-            return;
-        }
-        
-        tbody.innerHTML = '';
-        
-        pedidos.forEach(pedido => {
-            const tr = document.createElement('tr');
-            const fechaFormateada = formatearFecha(pedido.Fecha);
-            
-            tr.innerHTML = `
-                <td class="cell-id">#${pedido.IdPedidos}</td>
-                <td class="cell-date">${fechaFormateada}</td>
-                <td class="cell-empresa">${pedido.NombreEmpresa}</td>
-                <td>${pedido.Departamento}</td>
-                <td class="cell-cantidad">${pedido.TotalCantidad} Fardos</td>
-                <td>
-                    <div class="action-buttons">
-                        <button class="btn-action btn-iniciar" onclick="iniciarPedido(${pedido.IdPedidos})">
-                            <i class="fas fa-play"></i>
-                            Iniciar
-                        </button>
-                        <button class="btn-action btn-ver" onclick="verDetallePedido(${pedido.IdPedidos})">
-                            <i class="fas fa-eye"></i>
-                            Ver
-                        </button>
-                    </div>
-                </td>
-            `;
-            
-            tbody.appendChild(tr);
-        });
+        // Aplicar filtro si hay búsqueda activa
+        filtrarPedidosPorEmpresa();
         
     } catch (error) {
         console.error('Error al cargar pedidos pendientes:', error);
@@ -158,6 +217,56 @@ async function cargarPedidosPendientes() {
             </tr>
         `;
     }
+}
+
+// Renderizar tabla de pedidos pendientes
+function renderizarTablaPendientes(pedidos) {
+    const tbody = document.getElementById('bodyPendientes');
+    
+    if (pedidos.length === 0) {
+        const inputBuscar = document.getElementById('inputBuscarEmpresa');
+        const tieneBusqueda = inputBuscar && inputBuscar.value.trim() !== '';
+        
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="empty-state">
+                    <i class="fas ${tieneBusqueda ? 'fa-search' : 'fa-check-circle'}"></i>
+                    <p>${tieneBusqueda ? 'No se encontraron pedidos con ese nombre de empresa' : 'No hay pedidos pendientes por preparar'}</p>
+                    ${tieneBusqueda ? '<p style="color: #6b7280; font-size: 0.85rem; margin-top: 8px;">Intenta con otro término de búsqueda</p>' : ''}
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = '';
+    
+    pedidos.forEach(pedido => {
+        const tr = document.createElement('tr');
+        const fechaFormateada = formatearFecha(pedido.Fecha);
+        
+        tr.innerHTML = `
+            <td class="cell-id">#${pedido.IdPedidos}</td>
+            <td class="cell-date">${fechaFormateada}</td>
+            <td class="cell-empresa">${pedido.NombreEmpresa}</td>
+            <td>${pedido.Departamento}</td>
+            <td class="cell-cantidad">${pedido.TotalCantidad} Fardos</td>
+            <td>
+                <div class="action-buttons">
+                    <button class="btn-action btn-iniciar" onclick="iniciarPedido(${pedido.IdPedidos})">
+                        <i class="fas fa-play"></i>
+                        Iniciar
+                    </button>
+                    <button class="btn-action btn-ver" onclick="verDetallePedido(${pedido.IdPedidos})">
+                        <i class="fas fa-eye"></i>
+                        Ver
+                    </button>
+                </div>
+            </td>
+        `;
+        
+        tbody.appendChild(tr);
+    });
 }
 
 // Cargar pedidos en preparación (Estado 5)
@@ -179,7 +288,7 @@ async function cargarPedidosEnPreparacion() {
                 INNER JOIN departamentos ON pedidostienda_bodega.Departamento = departamentos.Id
             WHERE
                 pedidostienda_bodega.Estado = 5
-                AND pedidostienda_bodega.Nohojas > 0  -- AGREGADO: Filtrar solo con hojas
+                AND pedidostienda_bodega.Nohojas > 0
             ORDER BY pedidostienda_bodega.Fecha DESC`
         );
         
@@ -202,7 +311,7 @@ async function cargarPedidosEnPreparacion() {
             FROM detallepedidostienda_bodega
             WHERE IdConsolidado = ? 
             AND EstadoPreparacionproducto > 0 
-            AND EstadoPreparacionproducto != 4`,  // <-- AGREGADO: Excluir estado 4
+            AND EstadoPreparacionproducto != 4`,
             [pedido.IdPedidos]
         );
         const productosPreparados = normalizarResultado(resultadoPreparados)[0]?.total || 0;
@@ -862,7 +971,7 @@ async function iniciarPedido(idPedido) {
                     </p>
                     <div style="background: rgba(16, 185, 129, 0.1); padding: 12px; border-radius: 8px; border-left: 4px solid #10b981;">
                         <p style="color: #10b981; font-size: 0.9rem; margin: 0;">
-                            <i class="fas fa-info-circle"></i> El pedido se dividirá automáticamente en hojas de 25 Skus
+                            <i class="fas fa-info-circle"></i> El pedido se dividirá automáticamente en hojas de 40 Skus
                         </p>
                     </div>
                 </div>
@@ -933,7 +1042,7 @@ async function iniciarPedido(idPedido) {
                 INNER JOIN (
                     SELECT 
                         PedidosNumerados.*,
-                        CEILING(RowNum / 25.0) AS NumeroHoja
+                        CEILING(RowNum / 40.0) AS NumeroHoja
                     FROM (
                         SELECT 
                             PedidosDetallados.*,
@@ -1060,15 +1169,334 @@ async function iniciarPedido(idPedido) {
 
 // Función para ver detalle del pedido
 async function verDetallePedido(idPedido) {
-    await Swal.fire({
-        icon: 'info',
-        title: `Detalle del Pedido #${idPedido}`,
-        html: '<p>Función en desarrollo...</p>',
-        confirmButtonText: 'Cerrar',
-        confirmButtonColor: '#2563eb',
-        background: '#1a1d23',
-        color: '#ffffff'
-    });
+    try {
+        // Mostrar loading
+        Swal.fire({
+            title: 'Cargando detalle del pedido...',
+            html: `
+                <div style="text-align: center;">
+                    <div class="spinner" style="
+                        border: 4px solid rgba(37, 99, 235, 0.1);
+                        border-top: 4px solid #2563eb;
+                        border-radius: 50%;
+                        width: 50px;
+                        height: 50px;
+                        animation: spin 1s linear infinite;
+                        margin: 0 auto;
+                    "></div>
+                </div>
+            `,
+            showConfirmButton: false,
+            allowOutsideClick: false,
+            background: '#1a1d23',
+            color: '#ffffff'
+        });
+        
+        const connection = await connectionString();
+        
+        // Obtener información general del pedido
+        let infoPedido = await connection.query(
+            `SELECT
+                pedidostienda_bodega.IdPedidos,
+                pedidostienda_bodega.Fecha,
+                pedidostienda_bodega.NombreEmpresa,
+                pedidostienda_bodega.TotalCantidad,
+                pedidostienda_bodega.Departamento,
+                pedidostienda_bodega.Estado,
+                departamentos.Nombre as NombreDepartamento
+            FROM
+                pedidostienda_bodega
+                LEFT JOIN departamentos ON pedidostienda_bodega.Departamento = departamentos.Id
+            WHERE
+                pedidostienda_bodega.IdPedidos = ?`,
+            [idPedido]
+        );
+        
+        infoPedido = normalizarResultado(infoPedido);
+        
+        if (infoPedido.length === 0) {
+            await connection.close();
+            Swal.fire({
+                icon: 'error',
+                title: 'Pedido no encontrado',
+                text: 'No se encontró información del pedido',
+                confirmButtonText: 'Entendido',
+                confirmButtonColor: '#dc2626',
+                background: '#1a1d23',
+                color: '#ffffff'
+            });
+            return;
+        }
+        
+        const pedido = infoPedido[0];
+        
+        // Obtener detalle de productos del pedido
+        let detalleProductos = await connection.query(
+            `SELECT
+                detallepedidostienda_bodega.UPC, 
+                detallepedidostienda_bodega.Descripcion, 
+                detallepedidostienda_bodega.Cantidad
+            FROM
+                detallepedidostienda_bodega
+            WHERE
+                detallepedidostienda_bodega.IdConsolidado = ?
+            ORDER BY detallepedidostienda_bodega.Descripcion ASC`,
+            [idPedido]
+        );
+        
+        await connection.close();
+        
+        detalleProductos = normalizarResultado(detalleProductos);
+        
+        // Calcular totales
+        const totalSKUs = detalleProductos.length;
+        const totalFardos = detalleProductos.reduce((sum, item) => sum + (item.Cantidad || 0), 0);
+        
+        // Generar HTML de los productos
+        const productosHTML = detalleProductos.map((producto, index) => {
+            return `
+                <tr style="
+                    background: rgba(255, 255, 255, ${index % 2 === 0 ? '0.02' : '0.04'});
+                    transition: background 0.2s ease;
+                ">
+                    <td style="
+                        padding: 12px 16px;
+                        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                        font-family: 'Courier New', monospace;
+                        color: #3b82f6;
+                        font-size: 0.85rem;
+                        white-space: nowrap;
+                    ">${producto.UPC}</td>
+                    <td style="
+                        padding: 12px 16px;
+                        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                        color: #ffffff;
+                        font-size: 0.9rem;
+                    ">${producto.Descripcion}</td>
+                    <td style="
+                        padding: 12px 16px;
+                        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                        text-align: center;
+                        font-weight: 600;
+                        color: #10b981;
+                        font-size: 0.9rem;
+                        white-space: nowrap;
+                    ">${producto.Cantidad}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        // Obtener nombre del estado
+        const estadosMap = {
+            4: { nombre: 'Pendiente', color: '#f59e0b' },
+            5: { nombre: 'En Preparación', color: '#2563eb' }
+        };
+        const estadoInfo = estadosMap[pedido.Estado] || { nombre: 'Desconocido', color: '#6b7280' };
+        
+        // Mostrar modal con el detalle
+        Swal.fire({
+            title: `Detalle del Pedido #${idPedido}`,
+            html: `
+                <div style="text-align: left; max-height: 600px; overflow-y: auto; padding: 10px;">
+                    
+                    <!-- Información del Pedido -->
+                    <div style="
+                        background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(59, 130, 246, 0.05));
+                        padding: 20px;
+                        border-radius: 12px;
+                        margin-bottom: 24px;
+                        border: 1px solid rgba(37, 99, 235, 0.2);
+                    ">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                            <div>
+                                <div style="font-size: 0.75rem; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+                                    <i class="fas fa-calendar"></i> Fecha
+                                </div>
+                                <div style="font-size: 1rem; color: #ffffff; font-weight: 500;">
+                                    ${formatearFecha(pedido.Fecha)}
+                                </div>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.75rem; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+                                    <i class="fas fa-store"></i> Empresa
+                                </div>
+                                <div style="font-size: 1rem; color: #ffffff; font-weight: 500;">
+                                    ${pedido.NombreEmpresa}
+                                </div>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.75rem; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+                                    <i class="fas fa-map-marker-alt"></i> Departamento
+                                </div>
+                                <div style="font-size: 1rem; color: #ffffff; font-weight: 500;">
+                                    ${pedido.NombreDepartamento || pedido.Departamento}
+                                </div>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.75rem; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+                                    <i class="fas fa-info-circle"></i> Estado
+                                </div>
+                                <div style="
+                                    display: inline-flex;
+                                    align-items: center;
+                                    gap: 6px;
+                                    padding: 6px 12px;
+                                    background: rgba(${estadoInfo.color === '#f59e0b' ? '245, 158, 11' : '37, 99, 235'}, 0.15);
+                                    border-radius: 12px;
+                                    font-size: 0.85rem;
+                                    font-weight: 500;
+                                    color: ${estadoInfo.color};
+                                ">
+                                    <i class="fas fa-circle" style="font-size: 0.5rem;"></i>
+                                    ${estadoInfo.nombre}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Resumen de totales -->
+                        <div style="
+                            display: grid;
+                            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+                            gap: 12px;
+                            margin-top: 20px;
+                            padding-top: 20px;
+                            border-top: 1px solid rgba(255, 255, 255, 0.1);
+                        ">
+                            <div style="text-align: center; padding: 12px; background: rgba(255, 255, 255, 0.03); border-radius: 8px;">
+                                <div style="font-size: 1.8rem; font-weight: 700; color: #2563eb;">
+                                    ${totalSKUs}
+                                </div>
+                                <div style="font-size: 0.75rem; color: #9ca3af; text-transform: uppercase; margin-top: 4px;">
+                                    Total SKUs
+                                </div>
+                            </div>
+                            <div style="text-align: center; padding: 12px; background: rgba(255, 255, 255, 0.03); border-radius: 8px;">
+                                <div style="font-size: 1.8rem; font-weight: 700; color: #10b981;">
+                                    ${totalFardos}
+                                </div>
+                                <div style="font-size: 0.75rem; color: #9ca3af; text-transform: uppercase; margin-top: 4px;">
+                                    Total Fardos
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Título de la tabla -->
+                    <div style="margin-bottom: 12px;">
+                        <h3 style="
+                            font-size: 1.1rem;
+                            font-weight: 600;
+                            color: #ffffff;
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                            margin: 0;
+                        ">
+                            <i class="fas fa-boxes" style="color: #2563eb;"></i>
+                            Productos del Pedido
+                        </h3>
+                        <p style="color: #9ca3af; font-size: 0.85rem; margin: 4px 0 0 0;">
+                            Listado completo de todos los SKUs incluidos en este pedido
+                        </p>
+                    </div>
+                    
+                    <!-- Tabla de productos -->
+                    <div style="
+                        background: rgba(255, 255, 255, 0.02);
+                        border-radius: 10px;
+                        overflow: hidden;
+                        border: 1px solid rgba(255, 255, 255, 0.05);
+                    ">
+                        <table style="
+                            width: 100%;
+                            border-collapse: collapse;
+                        ">
+                            <thead>
+                                <tr style="background: rgba(37, 99, 235, 0.1);">
+                                    <th style="
+                                        padding: 14px 16px;
+                                        text-align: left;
+                                        font-size: 0.75rem;
+                                        font-weight: 600;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.5px;
+                                        color: #9ca3af;
+                                        border-bottom: 2px solid rgba(37, 99, 235, 0.2);
+                                        white-space: nowrap;
+                                        width: 1%;
+                                    ">UPC</th>
+                                    <th style="
+                                        padding: 14px 16px;
+                                        text-align: left;
+                                        font-size: 0.75rem;
+                                        font-weight: 600;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.5px;
+                                        color: #9ca3af;
+                                        border-bottom: 2px solid rgba(37, 99, 235, 0.2);
+                                    ">Descripción</th>
+                                    <th style="
+                                        padding: 14px 16px;
+                                        text-align: center;
+                                        font-size: 0.75rem;
+                                        font-weight: 600;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.5px;
+                                        color: #9ca3af;
+                                        border-bottom: 2px solid rgba(37, 99, 235, 0.2);
+                                        white-space: nowrap;
+                                        width: 1%;
+                                    ">Cantidad</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${productosHTML}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    ${detalleProductos.length === 0 ? `
+                        <div style="
+                            text-align: center;
+                            padding: 60px 20px;
+                            color: #6b7280;
+                        ">
+                            <i class="fas fa-inbox" style="font-size: 3rem; opacity: 0.3; margin-bottom: 16px; display: block;"></i>
+                            <p style="font-size: 1rem; margin: 0;">Este pedido no tiene productos registrados</p>
+                        </div>
+                    ` : ''}
+                </div>
+                
+                <style>
+                    /* Hover effect para las filas de la tabla */
+                    tbody tr:hover {
+                        background: rgba(37, 99, 235, 0.08) !important;
+                    }
+                </style>
+            `,
+            showConfirmButton: true,
+            confirmButtonText: '<i class="fas fa-times"></i> Cerrar',
+            confirmButtonColor: '#6b7280',
+            background: '#1a1d23',
+            color: '#ffffff',
+            width: '900px',
+            customClass: {
+                popup: 'swal2-no-scroll'
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error al cargar detalle del pedido:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'No se pudo cargar el detalle del pedido',
+            confirmButtonText: 'Entendido',
+            confirmButtonColor: '#dc2626',
+            background: '#1a1d23',
+            color: '#ffffff'
+        });
+    }
 }
 
 // Funciones auxiliares
@@ -1171,7 +1599,7 @@ async function verProgresoPreparacion(idPedido) {
                     IdConsolidado = ? AND
                     NoHoja = ? AND
                     EstadoPreparacionproducto > 0 AND
-                    EstadoPreparacionproducto != 4`,  // <-- AGREGADO: Excluir estado 4
+                    EstadoPreparacionproducto != 4`,
                 [idPedido, hoja.NoHoja]
             );
             const resultadoNormalizado = normalizarResultado(resultado);

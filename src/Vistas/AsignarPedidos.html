@@ -57,10 +57,25 @@
                     </h2>
                     <p>Estos pedidos están listos para iniciar su preparación</p>
                 </div>
-                <div class="header-stats">
-                    <div class="stat-card">
-                        <span class="stat-value" id="countPendientes">0</span>
-                        <span class="stat-label">Pedidos</span>
+                <div class="header-actions">
+                    <div class="search-container">
+                        <i class="fas fa-search search-icon"></i>
+                        <input 
+                            type="text" 
+                            id="inputBuscarEmpresa" 
+                            class="search-input" 
+                            placeholder="Buscar por empresa..."
+                            autocomplete="off"
+                        >
+                        <button id="btnLimpiarBusqueda" class="btn-clear-search" title="Limpiar búsqueda" style="display: none;">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="header-stats">
+                        <div class="stat-card">
+                            <span class="stat-value" id="countPendientes">0</span>
+                            <span class="stat-label">Pedidos</span>
+                        </div>
                     </div>
                 </div>
             </div>

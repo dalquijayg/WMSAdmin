@@ -14,6 +14,8 @@ if (process.env.NODE_ENV !== 'production') {
 let mainWindow;
 let asignarHojasWindow = null;
 let PedidosreportesWindow = null;
+let asignarTarimasWindow = null;
+let reporteRechequeadoresWindow = null;
 
 // Variable para controlar el estado de actualización
 let updateInProgress = false;
@@ -127,7 +129,68 @@ function createPedidosReportesWindow() {
         PedidosreportesWindow = null;
     });
 }
+function createReporteRechequeadoresWindow() {
+    if (updateInProgress) {
+        showUpdateInProgressDialog();
+        return;
+    }
 
+    if (reporteRechequeadoresWindow) {
+        if (reporteRechequeadoresWindow.isMinimized()) reporteRechequeadoresWindow.restore();
+        reporteRechequeadoresWindow.focus();
+        return;
+    }
+
+    reporteRechequeadoresWindow = new BrowserWindow({
+        width: 1200,
+        height: 800,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false,
+        },
+        icon: path.join(__dirname, 'Imagenes/logo-wms.png'),
+        title: 'WMS - Reporte Rechequeadores',
+        autoHideMenuBar: true,
+        backgroundColor: '#1a1d23'
+    });
+
+    reporteRechequeadoresWindow.loadURL(`file://${__dirname}/Vistas/ReporteRechequeadores.html`);
+
+    reporteRechequeadoresWindow.on('closed', () => {
+        reporteRechequeadoresWindow = null;
+    });
+}
+function createAsignarTarimasWindow() {
+    if (updateInProgress) {
+        showUpdateInProgressDialog();
+        return;
+    }
+
+    if (asignarTarimasWindow) {
+        if (asignarTarimasWindow.isMinimized()) asignarTarimasWindow.restore();
+        asignarTarimasWindow.focus();
+        return;
+    }
+
+    asignarTarimasWindow = new BrowserWindow({
+        width: 1200,
+        height: 800,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false,
+        },
+        icon: path.join(__dirname, 'Imagenes/logo-wms.png'),
+        title: 'Asignar tarimas',
+        autoHideMenuBar: true,
+        backgroundColor: '#1a1d23'
+    });
+
+    asignarTarimasWindow.loadURL(`file://${__dirname}/Vistas/AsignarTarimas.html`);
+
+    asignarTarimasWindow.on('closed', () => {
+        asignarTarimasWindow = null;
+    });
+}
 // Configurar eventos del auto-updater
 autoUpdater.on('checking-for-update', () => {
     log.info('Verificando actualizaciones...');
@@ -204,6 +267,13 @@ ipcMain.on('open_asignar_hojas', () => {
 
 ipcMain.on('open_pedidos_reportes', () => {
     createPedidosReportesWindow();
+});
+ipcMain.on('open_asignar_tarimas', () => {
+    createAsignarTarimasWindow();
+});
+
+ipcMain.on('open_reporte_rechequeadores', () => {
+    createReporteRechequeadoresWindow();
 });
 
 app.on('ready', createWindow);

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asignar Tarimas - WMS</title>
+    <link rel="stylesheet" href="../Diseno/Pedidos/AsignarTarimas.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="main-header">
+        <div class="header-left">
+            <button class="btn-back" id="btnVolver" title="Volver">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <div class="header-title">
+                <h1><i class="fas fa-pallet"></i> Asignar Tarimas</h1>
+                <p class="subtitle">Gestión de asignación de tarimas a pedidos</p>
+            </div>
+        </div>
+        <div class="header-right">
+            <!-- Indicador de auto-actualización -->
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px; margin-right: 15px;">
+                <div id="autoRefreshIndicator" style="font-size: 0.75rem; font-weight: 500;">
+                    <i class="fas fa-circle" style="color: #10b981; margin-right: 5px; animation: pulse 2s infinite;"></i>
+                    Auto-actualización activa
+                </div>
+                <div id="lastUpdateTime" style="font-size: 0.7rem; color: #6b7280;">
+                    Actualizando...
+                </div>
+            </div>
+            <div class="user-info" id="userInfo">
+                <i class="fas fa-user-circle"></i>
+                <span id="userName">Usuario</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Contenedor Principal -->
+    <div class="main-container">
+        <!-- Panel de Búsqueda y Filtros -->
+        <div class="search-panel">
+            <div class="search-container">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input 
+                        type="text" 
+                        id="searchInput" 
+                        placeholder="Buscar por empresa (ej: CACI, Central, etc.)"
+                        autocomplete="off"
+                    >
+                    <button class="btn-clear" id="btnClearSearch" title="Limpiar búsqueda">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <button class="btn-refresh" id="btnRefresh" title="Actualizar lista">
+                    <i class="fas fa-sync-alt"></i>
+                    <span>Actualizar</span>
+                </button>
+            </div>
+            
+            <div class="info-panel">
+                <div class="info-item">
+                    <i class="fas fa-box"></i>
+                    <div class="info-content">
+                        <span class="info-label">Total Pedidos</span>
+                        <span class="info-value" id="totalPedidos">0</span>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-pallet"></i>
+                    <div class="info-content">
+                        <span class="info-label">Total Tarimas</span>
+                        <span class="info-value" id="totalTarimas">0</span>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-boxes"></i>
+                    <div class="info-content">
+                        <span class="info-label">Total Cantidad</span>
+                        <span class="info-value" id="totalCantidad">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabla de Pedidos -->
+        <div class="table-container">
+            <div class="table-wrapper">
+                <table class="pedidos-table" id="pedidosTable">
+                    <thead>
+                        <tr>
+                            <th>ID Pedido</th>
+                            <th>Fecha</th>
+                            <th>Estado</th>
+                            <th>Empresa</th>
+                            <th>Fardos</th>
+                            <th>Tarimas</th>
+                            <th>Progreso Chequeo</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pedidosTableBody">
+                        <!-- Los datos se cargarán dinámicamente -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Mensaje cuando no hay datos -->
+            <div class="no-data" id="noDataMessage" style="display: none;">
+                <i class="fas fa-inbox"></i>
+                <p>No se encontraron pedidos</p>
+                <span>Intenta con otros criterios de búsqueda</span>
+            </div>
+            
+            <!-- Loading -->
+            <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+                <div class="spinner"></div>
+                <p>Cargando pedidos...</p>
+            </div>
+        </div>
+
+        <!-- Paginación -->
+        <div class="pagination-container" id="paginationContainer">
+            <div class="pagination-info">
+                <span>Mostrando <strong id="showingFrom">0</strong> - <strong id="showingTo">0</strong> de <strong id="totalRecords">0</strong> pedidos</span>
+            </div>
+            <div class="pagination-controls">
+                <button class="btn-page" id="btnFirstPage" title="Primera página">
+                    <i class="fas fa-angle-double-left"></i>
+                </button>
+                <button class="btn-page" id="btnPrevPage" title="Página anterior">
+                    <i class="fas fa-angle-left"></i>
+                </button>
+                <div class="page-numbers" id="pageNumbers">
+                    <!-- Los números de página se generarán dinámicamente -->
+                </div>
+                <button class="btn-page" id="btnNextPage" title="Página siguiente">
+                    <i class="fas fa-angle-right"></i>
+                </button>
+                <button class="btn-page" id="btnLastPage" title="Última página">
+                    <i class="fas fa-angle-double-right"></i>
+                </button>
+            </div>
+            <div class="page-size-selector">
+                <label for="pageSize">Registros por página:</label>
+                <select id="pageSize">
+                    <option value="10">10</option>
+                    <option value="25" selected>25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <script src="../Logica/Pedidios/AsignarTarimas.js"></script>
+</body>
+</html>
