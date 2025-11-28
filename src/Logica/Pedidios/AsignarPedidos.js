@@ -1042,12 +1042,27 @@ async function iniciarPedido(idPedido) {
                 INNER JOIN (
                     SELECT 
                         PedidosNumerados.*,
-                        CEILING(RowNum / 40.0) AS NumeroHoja
+                        CEILING(RowNum / 40.0) + CASE 
+                            WHEN EsNivel4 = 0 THEN 0 
+                            ELSE (SELECT CEILING(COUNT(*) / 40.0) 
+                                FROM (
+                                    SELECT 
+                                        pedidostienda_bodega.IdPedidos,
+                                        detallepedidostienda_bodega.UPC
+                                    FROM pedidostienda_bodega
+                                    INNER JOIN detallepedidostienda_bodega ON pedidostienda_bodega.IdPedidos = detallepedidostienda_bodega.IdConsolidado
+                                    INNER JOIN productospaquetes ON detallepedidostienda_bodega.UPC = productospaquetes.UPCPaquete
+                                    INNER JOIN productos ON productospaquetes.Upc = productos.Upc
+                                    INNER JOIN ubicacionesbodega ON productos.IdUbicacionBodega = ubicacionesbodega.Id
+                                    WHERE pedidostienda_bodega.IdPedidos = ?
+                                    AND ubicacionesbodega.Nivel != '4'
+                                ) AS ProductosNormales)
+                        END AS NumeroHoja
                     FROM (
                         SELECT 
                             PedidosDetallados.*,
-                            @row_number := IF(@current_pedido = PedidosDetallados.IdPedidos, @row_number + 1, 1) AS RowNum,
-                            @current_pedido := PedidosDetallados.IdPedidos
+                            @row_number := IF(@current_grupo = PedidosDetallados.EsNivel4, @row_number + 1, 1) AS RowNum,
+                            @current_grupo := PedidosDetallados.EsNivel4
                         FROM (
                             SELECT
                                 pedidostienda_bodega.IdPedidos, 
@@ -1059,7 +1074,8 @@ async function iniciarPedido(idPedido) {
                                 ubicacionesbodega.Rack, 
                                 ubicacionesbodega.Nivel, 
                                 ubicacionesbodega.Descripcion AS Ubicacion,
-                                ubicacionesbodega.Id as IdUbicacionBodega
+                                ubicacionesbodega.Id as IdUbicacionBodega,
+                                CASE WHEN ubicacionesbodega.Nivel = '4' THEN 1 ELSE 0 END AS EsNivel4
                             FROM
                                 pedidostienda_bodega
                                 INNER JOIN detallepedidostienda_bodega ON pedidostienda_bodega.IdPedidos = detallepedidostienda_bodega.IdConsolidado
@@ -1069,17 +1085,18 @@ async function iniciarPedido(idPedido) {
                             WHERE
                                 pedidostienda_bodega.IdPedidos = ?
                             ORDER BY 
+                                EsNivel4 ASC,  -- Primero los normales (0), luego Nivel 4 (1)
                                 Nivel ASC,
                                 Id ASC
                         ) AS PedidosDetallados
-                        CROSS JOIN (SELECT @current_pedido := 0, @row_number := 0) AS vars
+                        CROSS JOIN (SELECT @current_grupo := -1, @row_number := 0) AS vars
                     ) AS PedidosNumerados
                 ) AS t ON d.Id = t.DetalleId
                 SET 
                     d.NoHoja = t.NumeroHoja,
                     d.IdUbicacionBodega = t.IdUbicacionBodega
                 WHERE d.IdConsolidado = ?
-            `, [idPedido, idPedido]);
+            `, [idPedido, idPedido, idPedido]);
             
             // 4. Insertar en PreparacionPedidos
             await connection.query(`
@@ -1703,7 +1720,7 @@ async function verProgresoPreparacion(idPedido) {
                         </div>
                     </div>
                     
-                    <div style="display: flex; gap: 20px; font-size: 0.85rem; color: #9ca3af;">
+                    <div style="display: flex; gap: 20px; font-size: 0.85rem; color: #9ca3af; margin-bottom: 12px;">
                         <div>
                             <i class="fas fa-cubes"></i> ${hoja.TotalFardos} Fardos
                         </div>
@@ -1717,6 +1734,14 @@ async function verProgresoPreparacion(idPedido) {
                                 <i class="fas fa-check"></i> Finalizado: ${formatearFechaHora(hoja.FechaHorafinalizo)}
                             </div>
                         ` : ''}
+                    </div>
+                    
+                    <!-- BOTÓN NUEVO: Ver Detalle de Productos -->
+                    <div style="margin-top: 12px;">
+                        <button class="btn-action btn-ver" onclick="verDetalleProductosHoja(${idPedido}, ${hoja.NoHoja})" style="width: 100%; justify-content: center;">
+                            <i class="fas fa-list-ul"></i>
+                            Ver Detalle de Productos
+                        </button>
                     </div>
                     
                     ${mensajeEstado}
@@ -1810,7 +1835,390 @@ async function verProgresoPreparacion(idPedido) {
         });
     }
 }
+async function verDetalleProductosHoja(idPedido, noHoja) {
+    try {
+        // Mostrar loading
+        Swal.fire({
+            title: 'Cargando productos...',
+            html: `
+                <div style="text-align: center;">
+                    <div class="spinner" style="
+                        border: 4px solid rgba(37, 99, 235, 0.1);
+                        border-top: 4px solid #2563eb;
+                        border-radius: 50%;
+                        width: 50px;
+                        height: 50px;
+                        animation: spin 1s linear infinite;
+                        margin: 0 auto;
+                    "></div>
+                </div>
+            `,
+            showConfirmButton: false,
+            allowOutsideClick: false,
+            background: '#1a1d23',
+            color: '#ffffff'
+        });
+        
+        const connection = await connectionString();
+        
+        // Obtener productos de la hoja con su ubicación
+        let productos = await connection.query(
+            `SELECT
+                detallepedidostienda_bodega.UPC,
+                detallepedidostienda_bodega.Descripcion,
+                detallepedidostienda_bodega.Cantidad,
+                detallepedidostienda_bodega.EstadoPreparacionproducto,
+                ubicacionesbodega.Rack,
+                ubicacionesbodega.Nivel,
+                ubicacionesbodega.Descripcion as UbicacionDescripcion
+            FROM
+                detallepedidostienda_bodega
+                INNER JOIN productospaquetes ON detallepedidostienda_bodega.UPC = productospaquetes.UPCPaquete
+                INNER JOIN productos ON productospaquetes.Upc = productos.Upc
+                LEFT JOIN ubicacionesbodega ON productos.IdUbicacionBodega = ubicacionesbodega.Id
+            WHERE
+                detallepedidostienda_bodega.IdConsolidado = ?
+                AND detallepedidostienda_bodega.NoHoja = ?
+            ORDER BY
+                ubicacionesbodega.Nivel ASC,
+                ubicacionesbodega.Rack ASC,
+                detallepedidostienda_bodega.Descripcion ASC`,
+            [idPedido, noHoja]
+        );
+        
+        await connection.close();
+        
+        productos = normalizarResultado(productos);
+        
+        if (productos.length === 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Sin productos',
+                text: 'Esta hoja no tiene productos asignados',
+                confirmButtonText: 'Entendido',
+                confirmButtonColor: '#f59e0b',
+                background: '#1a1d23',
+                color: '#ffffff'
+            });
+            return;
+        }
+        
+        // Generar HTML de los productos
+        const productosHTML = productos.map((producto, index) => {
+            // Determinar estado de preparación
+            let estadoPreparacion = '';
+            let colorEstado = '#6b7280';
+            
+            if (producto.EstadoPreparacionproducto === 0 || producto.EstadoPreparacionproducto === null) {
+                estadoPreparacion = '<span style="color: #6b7280;"><i class="fas fa-clock"></i> Pendiente</span>';
+                colorEstado = '#6b7280';
+            } else if (producto.EstadoPreparacionproducto === 4) {
+                estadoPreparacion = '<span style="color: #f59e0b;"><i class="fas fa-exclamation-triangle"></i> Faltante</span>';
+                colorEstado = '#f59e0b';
+            } else if (producto.EstadoPreparacionproducto > 0) {
+                estadoPreparacion = '<span style="color: #10b981;"><i class="fas fa-check-circle"></i> Preparado</span>';
+                colorEstado = '#10b981';
+            }
+            
+            return `
+                <tr style="
+                    background: rgba(255, 255, 255, ${index % 2 === 0 ? '0.02' : '0.04'});
+                    transition: background 0.2s ease;
+                    border-left: 3px solid ${colorEstado};
+                ">
+                    <td style="
+                        padding: 12px 16px;
+                        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                        font-family: 'Courier New', monospace;
+                        color: #3b82f6;
+                        font-size: 0.85rem;
+                        white-space: nowrap;
+                    ">${producto.UPC}</td>
+                    <td style="
+                        padding: 12px 16px;
+                        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                        color: #ffffff;
+                        font-size: 0.9rem;
+                    ">${producto.Descripcion}</td>
+                    <td style="
+                        padding: 12px 16px;
+                        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                        text-align: center;
+                        white-space: nowrap;
+                    ">
+                        <div style="
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 6px;
+                            padding: 4px 10px;
+                            background: rgba(245, 158, 11, 0.15);
+                            border-radius: 12px;
+                            font-weight: 600;
+                            color: #f59e0b;
+                            font-size: 0.85rem;
+                        ">
+                            <i class="fas fa-layer-group"></i>
+                            Nivel ${producto.Nivel || 'N/A'}
+                        </div>
+                    </td>
+                    <td style="
+                        padding: 12px 16px;
+                        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                        text-align: center;
+                        white-space: nowrap;
+                    ">
+                        <div style="
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 6px;
+                            padding: 4px 10px;
+                            background: rgba(37, 99, 235, 0.15);
+                            border-radius: 12px;
+                            font-weight: 600;
+                            color: #2563eb;
+                            font-size: 0.85rem;
+                        ">
+                            <i class="fas fa-warehouse"></i>
+                            Rack ${producto.Rack || 'N/A'}
+                        </div>
+                    </td>
+                    <td style="
+                        padding: 12px 16px;
+                        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                        color: #9ca3af;
+                        font-size: 0.85rem;
+                    ">${producto.UbicacionDescripcion || 'Sin ubicación'}</td>
+                    <td style="
+                        padding: 12px 16px;
+                        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                        text-align: center;
+                        font-weight: 600;
+                        color: #10b981;
+                        font-size: 0.9rem;
+                    ">${producto.Cantidad}</td>
+                    <td style="
+                        padding: 12px 16px;
+                        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                        text-align: center;
+                        font-size: 0.85rem;
+                    ">${estadoPreparacion}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        // Calcular totales
+        const totalSKUs = productos.length;
+        const totalFardos = productos.reduce((sum, p) => sum + (p.Cantidad || 0), 0);
+        const productosPreparados = productos.filter(p => p.EstadoPreparacionproducto > 0 && p.EstadoPreparacionproducto !== 4).length;
+        const productosFaltantes = productos.filter(p => p.EstadoPreparacionproducto === 4).length;
+        const porcentaje = totalSKUs > 0 ? Math.round((productosPreparados / totalSKUs) * 100) : 0;
+        
+        // Mostrar modal con el detalle
+        Swal.fire({
+            title: `Productos de la Hoja ${noHoja} - Pedido #${idPedido}`,
+            html: `
+                <div style="text-align: left; max-height: 600px; overflow-y: auto; padding: 10px;">
+                    
+                    <!-- Resumen de la hoja -->
+                    <div style="
+                        background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(59, 130, 246, 0.05));
+                        padding: 16px;
+                        border-radius: 12px;
+                        margin-bottom: 20px;
+                        border: 1px solid rgba(37, 99, 235, 0.2);
+                    ">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 12px;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 1.5rem; font-weight: 700; color: #2563eb;">${totalSKUs}</div>
+                                <div style="font-size: 0.75rem; color: #9ca3af; text-transform: uppercase;">SKUs</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 1.5rem; font-weight: 700; color: #10b981;">${totalFardos}</div>
+                                <div style="font-size: 0.75rem; color: #9ca3af; text-transform: uppercase;">Fardos</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 1.5rem; font-weight: 700; color: #10b981;">${productosPreparados}</div>
+                                <div style="font-size: 0.75rem; color: #9ca3af; text-transform: uppercase;">Preparados</div>
+                            </div>
+                            ${productosFaltantes > 0 ? `
+                            <div style="text-align: center;">
+                                <div style="font-size: 1.5rem; font-weight: 700; color: #f59e0b;">${productosFaltantes}</div>
+                                <div style="font-size: 0.75rem; color: #9ca3af; text-transform: uppercase;">Faltantes</div>
+                            </div>
+                            ` : ''}
+                        </div>
+                        <div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.9rem;">
+                                <span style="color: #9ca3af;">Progreso de Preparación</span>
+                                <span style="color: #ffffff; font-weight: 600;">${porcentaje}%</span>
+                            </div>
+                            <div style="
+                                width: 100%;
+                                height: 8px;
+                                background: rgba(255, 255, 255, 0.1);
+                                border-radius: 10px;
+                                overflow: hidden;
+                            ">
+                                <div style="
+                                    width: ${porcentaje}%;
+                                    height: 100%;
+                                    background: linear-gradient(90deg, #10b981, #059669);
+                                    border-radius: 10px;
+                                "></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Título de la tabla -->
+                    <div style="margin-bottom: 12px;">
+                        <h3 style="
+                            font-size: 1.1rem;
+                            font-weight: 600;
+                            color: #ffffff;
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                            margin: 0;
+                        ">
+                            <i class="fas fa-boxes" style="color: #2563eb;"></i>
+                            Listado de Productos
+                        </h3>
+                        <p style="color: #9ca3af; font-size: 0.85rem; margin: 4px 0 0 0;">
+                            Productos ordenados por ubicación (Nivel y Rack)
+                        </p>
+                    </div>
+                    
+                    <!-- Tabla de productos -->
+                    <div style="
+                        background: rgba(255, 255, 255, 0.02);
+                        border-radius: 10px;
+                        overflow: hidden;
+                        border: 1px solid rgba(255, 255, 255, 0.05);
+                    ">
+                        <table style="
+                            width: 100%;
+                            border-collapse: collapse;
+                        ">
+                            <thead>
+                                <tr style="background: rgba(37, 99, 235, 0.1);">
+                                    <th style="
+                                        padding: 14px 16px;
+                                        text-align: left;
+                                        font-size: 0.75rem;
+                                        font-weight: 600;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.5px;
+                                        color: #9ca3af;
+                                        border-bottom: 2px solid rgba(37, 99, 235, 0.2);
+                                        white-space: nowrap;
+                                    ">UPC</th>
+                                    <th style="
+                                        padding: 14px 16px;
+                                        text-align: left;
+                                        font-size: 0.75rem;
+                                        font-weight: 600;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.5px;
+                                        color: #9ca3af;
+                                        border-bottom: 2px solid rgba(37, 99, 235, 0.2);
+                                    ">Descripción</th>
+                                    <th style="
+                                        padding: 14px 16px;
+                                        text-align: center;
+                                        font-size: 0.75rem;
+                                        font-weight: 600;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.5px;
+                                        color: #9ca3af;
+                                        border-bottom: 2px solid rgba(37, 99, 235, 0.2);
+                                        white-space: nowrap;
+                                    ">Nivel</th>
+                                    <th style="
+                                        padding: 14px 16px;
+                                        text-align: center;
+                                        font-size: 0.75rem;
+                                        font-weight: 600;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.5px;
+                                        color: #9ca3af;
+                                        border-bottom: 2px solid rgba(37, 99, 235, 0.2);
+                                        white-space: nowrap;
+                                    ">Rack</th>
+                                    <th style="
+                                        padding: 14px 16px;
+                                        text-align: left;
+                                        font-size: 0.75rem;
+                                        font-weight: 600;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.5px;
+                                        color: #9ca3af;
+                                        border-bottom: 2px solid rgba(37, 99, 235, 0.2);
+                                    ">Ubicación</th>
+                                    <th style="
+                                        padding: 14px 16px;
+                                        text-align: center;
+                                        font-size: 0.75rem;
+                                        font-weight: 600;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.5px;
+                                        color: #9ca3af;
+                                        border-bottom: 2px solid rgba(37, 99, 235, 0.2);
+                                        white-space: nowrap;
+                                    ">Cantidad</th>
+                                    <th style="
+                                        padding: 14px 16px;
+                                        text-align: center;
+                                        font-size: 0.75rem;
+                                        font-weight: 600;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.5px;
+                                        color: #9ca3af;
+                                        border-bottom: 2px solid rgba(37, 99, 235, 0.2);
+                                        white-space: nowrap;
+                                    ">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${productosHTML}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <style>
+                    /* Hover effect para las filas de la tabla */
+                    tbody tr:hover {
+                        background: rgba(37, 99, 235, 0.08) !important;
+                    }
+                </style>
+            `,
+            showConfirmButton: true,
+            confirmButtonText: '<i class="fas fa-times"></i> Cerrar',
+            confirmButtonColor: '#6b7280',
+            background: '#1a1d23',
+            color: '#ffffff',
+            width: '1100px',
+            customClass: {
+                popup: 'swal2-no-scroll'
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error al cargar detalle de productos:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'No se pudo cargar el detalle de productos de la hoja',
+            confirmButtonText: 'Entendido',
+            confirmButtonColor: '#dc2626',
+            background: '#1a1d23',
+            color: '#ffffff'
+        });
+    }
+}
 
+// Exportar la nueva función
+window.verDetalleProductosHoja = verDetalleProductosHoja;
 // Exportar la función
 window.verProgresoPreparacion = verProgresoPreparacion;
 // Exportar funciones globales
